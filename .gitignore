@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Virtualenvs
+.venv/
+venv/
+
+# User config — the default path is ~/.claude/cc-switch.json, but
+# CC_SWITCH_FILE (or running from a checkout) can drop one in the working
+# directory.  It holds provider shapes, never secrets, but it is still
+# local configuration and does not belong in the repository.
+cc-switch.json
+
+# Test / tool caches
+.pytest_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
