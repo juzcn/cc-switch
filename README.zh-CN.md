@@ -34,8 +34,12 @@ powershell -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.c
 
 安装脚本和 `--force` 形式都是**幂等**的——首次运行安装，重跑即**更新**到
 PyPI 最新版。不带 `--force` 的 `uv tool install cc-switch` 在工具已安装时
-是空操作。卸载用 `uninstall.sh` / `uninstall.ps1`（`~/.claude/cc-switch.json`
-下的配置会保留）。
+是空操作。
+
+卸载用 `uninstall.sh` / `uninstall.ps1`。卸载脚本还会把 `activate` 注入系统
+环境的 `ANTHROPIC_AUTH_TOKEN` 一并移除（在卸载工具**之前**执行，因为
+`credstore` 的 CLI 就装在 cc-switch 的工具环境里）；`~/.claude/cc-switch.json`
+配置与生成的 `~/.claude/settings.json` 会保留。
 
 ## 命令
 
@@ -56,7 +60,7 @@ models 提示对当前列表做**对称差**（toggle）：输入中已存在的
 cc-switch set deepseek
 # Base URL [..]: https://api.deepseek.com/anthropic
 # API key name (credstore key): DEEPSEEK_API_KEY
-# Supported models (comma separated; toggles against the current list): deepseek-chat,deepseek-reasoner
+# Supported models (comma, space, or semicolon separated; toggles against the current list): deepseek-chat,deepseek-reasoner
 ```
 
 密钥值从不被询问或写入——先用下面的命令存入：
@@ -72,6 +76,10 @@ credstore 注入系统环境为 `ANTHROPIC_AUTH_TOKEN`（镜像 `credstore injec
 Windows 注册表，Unix shell 配置文件），新启动的 Claude Code 会话即可继承。
 settings 文件中**不含**任何凭据。
 
+> `activate` 会**整体替换** `~/.claude/settings.json`——不是合并。该文件里
+> 手写的设置会被生成的模板（env 块加 `autoUpdatesChannel`）覆盖。请把手动
+> 定制放到别的 settings 文件里，或在 activate 之后重新应用。
+
 先写入 `settings.json`，再从 credstore 解析密钥。若密钥缺失——或 credstore
 本身未安装——`activate` 会大声报错并给出相应提示，settings 文件已留在磁盘上
 但**不会**注入 token。
@@ -85,14 +93,39 @@ cc-switch activate deepseek/deepseek-chat
 
 省略模型时：provider 只有一个模型则直接使用；有多个则提示选择。
 
+环境注入只对*新*进程生效，在**当前** shell 里生效要用导出行：
+
+```bash
+eval "$(cc-switch activate deepseek/deepseek-chat)"
+```
+
+stdout 被管道化时，cc-switch **只**把这一行写到 stdout，状态报告全部走
+stderr——所以上面的 `eval` 是安全的。在终端上则照常打印人类可读的报告。
+
 ### `cc-switch activate <provider-name/model-name> --custom`
 
 与 `activate` 相同，但会先让你逐个覆盖每个模型槽位——
 `ANTHROPIC_DEFAULT_HAIKU_MODEL`、`ANTHROPIC_DEFAULT_SONNET_MODEL`、
-`ANTHROPIC_DEFAULT_OPUS_MODEL`、`ANTHROPIC_CLAUDE_CODE_SUBAGENT_MODEL`、
-`ANTHROPIC_CLAUDE_CODE_EFFORT_LEVEL`——一次一个。输入值即覆盖，回车保留
-默认。主模型槽位（`ANTHROPIC_MODEL`）在命令行上选定，不在此处覆盖。
-覆盖是一次性的：从不改动存储的 provider 配置。
+`ANTHROPIC_DEFAULT_OPUS_MODEL`、`CLAUDE_CODE_SUBAGENT_MODEL`、
+`CLAUDE_CODE_EFFORT_LEVEL`——一次一个。输入值即覆盖，回车保留默认，
+输入 `-` 将该槽位清空为空字符串。主模型槽位（`ANTHROPIC_MODEL`）在命令行
+上选定，不在此处覆盖。覆盖是一次性的：从不改动存储的 provider 配置。
+effort 提示接受 `low`、`medium`、`high`、`xhigh`、`max` 或 `auto`。
+
+#### 写入的环境变量
+
+| 变量 | 值 |
+|------|-----|
+| `ANTHROPIC_BASE_URL` | provider 的 base URL |
+| `ANTHROPIC_MODEL` | 命令行上选定的模型 |
+| `ANTHROPIC_DEFAULT_HAIKU_MODEL` / `_SONNET_` / `_OPUS_` | 主模型（可用 `--custom` 覆盖） |
+| `CLAUDE_CODE_SUBAGENT_MODEL` | 主模型（可用 `--custom` 覆盖） |
+| `CLAUDE_CODE_EFFORT_LEVEL` | `max`（可用 `--custom` 覆盖） |
+
+注意前缀：`ANTHROPIC_` 用于 provider/端点与模型槽位变量，而 harness 行为类
+变量使用裸 `CLAUDE_CODE_` 前缀。**不存在** `ANTHROPIC_CLAUDE_CODE_*` 命名空间
+——Claude Code 会**静默忽略**无法识别的键，所以拼错的槽位不会报错，只是
+完全不生效。参见[环境变量参考](https://code.claude.com/docs/en/env-vars)。
 
 ### `cc-switch`
 
@@ -134,7 +167,9 @@ scnet/scnet-1m  (active)
   `ANTHROPIC_MODEL`、`ANTHROPIC_BASE_URL` 或 `ANTHROPIC_AUTH_TOKEN`——
   这些槽位归 cc-switch 所有，密钥绝不能进入明文配置。
 - 在 TTY 上，`activate` 打印激活提示而不回显密钥；stdout 被管道化时输出
-  供 `eval` 使用的 shell 导出行。
+  供 `eval` 使用的 shell 导出行，其余所有行都走 stderr，保证管道内容干净。
+- `activate` 会整体替换 `~/.claude/settings.json`（不是合并）——详见上文
+  `activate` 一节的说明。
 - 激活后重启 shell（或新开终端）当前会话的环境变更才会生效。
 - 密钥是不可变的 Python `str`——cc-switch 沿用 credstore 的做法，用完后立即
   `del` 引用。
@@ -158,7 +193,7 @@ CI 在 Windows、macOS、Linux 上跑测试（`.github/workflows/ci.yml`），�
 改 `pyproject.toml` 里的 `version`，提交，然后推一个同名 tag：
 
 ```bash
-git tag -a v0.9.12 -m "cc-switch 0.9.12" && git push origin v0.9.12
+git tag -a v0.9.13 -m "cc-switch 0.9.13" && git push origin v0.9.13
 ```
 
 `.github/workflows/publish.yml` 会校验 tag 与包版本完全一致，不一致直接失败；通过后经 trusted publishing 上传到 PyPI。

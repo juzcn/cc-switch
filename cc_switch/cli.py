@@ -36,6 +36,28 @@ def _err(msg: str) -> None:
     print(f"Error: {msg}", file=sys.stderr)
 
 
+def _status(msg: str = "", *, end: str = "\n") -> None:
+    """Print human-facing status without polluting the ``eval`` stream.
+
+    When stdout is a pipe, ``activate`` emits the shell export line there
+    so that ``eval "$(cc-switch activate …)"`` works (the same contract
+    credstore's CLI follows).  Status text therefore has to go to stderr
+    in that case, and to stdout when a person is watching a terminal.
+    """
+    print(msg, end=end, file=sys.stdout if sys.stdout.isatty() else sys.stderr)
+
+
+def _ask(prompt: str) -> str:
+    """Read one line, writing the prompt through :func:`_status`.
+
+    ``input(prompt)`` always writes the prompt to stdout, which would
+    prepend it to the export line when stdout is piped — so the prompt is
+    emitted separately and stdin is read bare.
+    """
+    _status(prompt, end="")
+    return input().strip()
+
+
 def _parse_provider_model(spec: str) -> tuple[str, str | None]:
     """Split 'provider/model' into (provider, model-or-None)."""
     if "/" in spec:
@@ -52,10 +74,10 @@ def _prompt_required(prompt: str, current: str = "") -> str:
     """
     hint = f" [{current}]" if current else ""
     while True:
-        value = input(f"{prompt}{hint}: ").strip()
+        value = _ask(f"{prompt}{hint}: ")
         if value or current:
             return value or current
-        print("(required — cannot be empty)", file=sys.stderr)
+        _status("(required — cannot be empty)")
 
 
 def _parse_models(text: str) -> list[str]:
@@ -75,11 +97,11 @@ def _prompt_models(current: list[str]) -> list[str]:
     current value would instead toggle the whole list off.
     """
     hint = ", ".join(current) if current else ""
-    text = input(
+    text = _ask(
         "Supported models (comma, space, or semicolon separated; "
         "toggles against the current list)"
         f"{' [' + hint + ']' if hint else ' [blank = keep current]'}: "
-    ).strip()
+    )
     return _parse_models(text)
 
 
@@ -90,20 +112,22 @@ def _cmd_set(args) -> int:
     """Create or edit a provider.  Exists → edit, missing → add."""
     name = args.provider
     providers = _api.load_config().get("providers", {})
-    current = providers.get(name)
-    is_edit = current is not None
+    current = providers.get(name) or {}
+    is_edit = bool(current)
 
     if is_edit:
         print(f"Editing provider '{name}' (press Enter to keep current value).")
     else:
         print(f"Adding provider '{name}'.")
 
-    base_url = _prompt_required("Base URL", current["base_url"] if current else "")
+    # ``.get`` throughout: a hand-edited or older config may be missing
+    # any of these keys, and a KeyError here would be an unhelpful crash.
+    base_url = _prompt_required("Base URL", current.get("base_url", ""))
     api_key_name = _prompt_required(
-        "API key name (credstore key)", current["api_key_name"] if current else ""
+        "API key name (credstore key)", current.get("api_key_name", "")
     )
-    models = _prompt_models(current["models"] if current else [])
-    extra_env = current.get("extra_env") if current else None
+    models = _prompt_models(current.get("models") or [])
+    extra_env = current.get("extra_env")
     if is_edit:
         _api.update_provider(
             name, base_url=base_url, api_key_name=api_key_name, extra_env=extra_env
@@ -150,9 +174,9 @@ def _collect_overrides(main_model: str) -> dict:
     for key in _defaults.DEFAULT_OVERRIDE_KEYS:
         current = _defaults.default_value(key, main_model)
         hint = ""
-        if key == "ANTHROPIC_CLAUDE_CODE_EFFORT_LEVEL":
-            hint = " (low|medium|high|xhigh|max)"
-        value = input(f"{key} [{current}]{hint}: ").strip()
+        if key == "CLAUDE_CODE_EFFORT_LEVEL":
+            hint = " (low|medium|high|xhigh|max|auto)"
+        value = _ask(f"{key} [{current}]{hint}: ")
         if value:
             # '-' clears the field to an empty string; anything else overrides.
             overrides[key] = "" if value == "-" else value
@@ -176,11 +200,11 @@ def _cmd_activate(args) -> int:
         elif not models:
             model_name = _prompt_required("Model name")
         else:
-            print("Available models:")
+            _status("Available models:")
             for i, m in enumerate(models, 1):
-                print(f"  {i}. {m}")
+                _status(f"  {i}. {m}")
             try:
-                choice = int(input("Select a model by number: ").strip())
+                choice = int(_ask("Select a model by number: "))
             except ValueError:
                 _err("invalid selection.")
                 return 1
@@ -211,9 +235,9 @@ def _cmd_activate(args) -> int:
         _err("settings.json was written, but ANTHROPIC_AUTH_TOKEN was not injected.")
         return 1
 
-    print(f"Activated {provider_name}/{model_name}.")
-    print(f"  Wrote: {_activate.SETTINGS_PATH}")
-    print(
+    _status(f"Activated {provider_name}/{model_name}.")
+    _status(f"  Wrote: {_activate.SETTINGS_PATH}")
+    _status(
         f"  Injected ANTHROPIC_AUTH_TOKEN from credstore '{provider['api_key_name']}'."
     )
     _api.set_active(f"{provider_name}/{model_name}")

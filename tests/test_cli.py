@@ -98,6 +98,22 @@ class TestSet:
         assert p["base_url"] == "https://new"
         assert p["models"] == ["a", "b"]
 
+    def test_edit_tolerates_record_missing_fields(self, config_path, monkeypatch):
+        """A hand-edited/older record may lack base_url or models.
+
+        Editing it must prompt with empty defaults rather than crash on a
+        KeyError — ``list`` and ``_api`` already read these with .get().
+        """
+        with open(config_path, "w", encoding="utf-8") as fh:
+            json.dump({"providers": {"ds": {"api_key_name": "K"}}}, fh)
+        # blank keeps the (absent) values, so the prompts must not re-loop
+        feed_inputs(monkeypatch, ["https://filled", "", "m1"])
+        assert cli.main(["set", "ds"]) == 0
+        p = _api.load_config()["providers"]["ds"]
+        assert p["base_url"] == "https://filled"
+        assert p["api_key_name"] == "K"
+        assert p["models"] == ["m1"]
+
 
 class TestRemove:
     def test_remove_existing(self, config_path, monkeypatch, capsys):
@@ -155,10 +171,49 @@ class TestActivate:
         assert cli.main(["activate", "ds/only-model"]) == 0
         parsed = json.loads(Path(settings_path).read_text(encoding="utf-8"))
         assert parsed["env"]["ANTHROPIC_MODEL"] == "only-model"
-        out = capsys.readouterr().out
-        assert "Injected ANTHROPIC_AUTH_TOKEN" in out
+        # stdout is a pipe under pytest, so the report goes to stderr
+        assert "Injected ANTHROPIC_AUTH_TOKEN" in capsys.readouterr().err
         raw = Path(settings_path).read_text(encoding="utf-8")
         assert "sk-secret" not in raw
+
+    def test_piped_stdout_carries_only_the_export_line(
+        self, config_path, settings_path, monkeypatch, capsys
+    ):
+        """``eval "$(cc-switch activate …)"`` must receive shell and nothing else.
+
+        Under pytest stdout is not a TTY, so the CLI is in the piped
+        branch: status text goes to stderr and stdout holds only the
+        export line that ``eval`` consumes.
+        """
+        _api.add_provider("ds", "https://x", "K", ["m1"])
+        monkeypatch.setattr(_activate, "resolve_secret", lambda _n: "sk-secret")
+        monkeypatch.setattr(_activate, "SETTINGS_PATH", settings_path)
+        monkeypatch.setattr("credstore.persist_key", lambda *a, **kw: None)
+
+        assert cli.main(["activate", "ds/m1"]) == 0
+        captured = capsys.readouterr()
+        assert captured.out.count("\n") == 1
+        assert "ANTHROPIC_AUTH_TOKEN" in captured.out
+        # the human-facing report did not leak into the eval stream
+        assert "Activated" not in captured.out
+        assert "Activated ds/m1." in captured.err
+
+    def test_piped_stdout_clean_when_model_is_picked(
+        self, config_path, settings_path, monkeypatch, capsys
+    ):
+        """The interactive model menu must not prepend itself to the export line."""
+        _api.add_provider("ds", "https://x", "K", ["a", "b"])
+        monkeypatch.setattr(_activate, "resolve_secret", lambda _n: "sk-secret")
+        monkeypatch.setattr(_activate, "SETTINGS_PATH", settings_path)
+        monkeypatch.setattr("credstore.persist_key", lambda *a, **kw: None)
+        feed_inputs(monkeypatch, ["2"])
+
+        assert cli.main(["activate", "ds"]) == 0
+        captured = capsys.readouterr()
+        assert "Available models:" not in captured.out
+        assert "Select a model by number" not in captured.out
+        assert captured.out.count("\n") == 1
+        assert "ANTHROPIC_AUTH_TOKEN" in captured.out
 
     def test_activate_records_active(
         self, config_path, settings_path, monkeypatch, capsys, no_real_inject
@@ -226,7 +281,7 @@ class TestActivate:
         parsed = json.loads(Path(settings_path).read_text(encoding="utf-8"))
         env = parsed["env"]
         assert env["ANTHROPIC_DEFAULT_SONNET_MODEL"] == "sonnet-x"
-        assert env["ANTHROPIC_CLAUDE_CODE_EFFORT_LEVEL"] == "max"
+        assert env["CLAUDE_CODE_EFFORT_LEVEL"] == "max"
         assert env["ANTHROPIC_MODEL"] == "m1"
 
     def test_custom_dash_clears_field(

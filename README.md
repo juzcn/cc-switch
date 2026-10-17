@@ -42,8 +42,13 @@ powershell -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.c
 The installers and the `--force` form are **idempotent** — the first run
 installs, re-running **updates** to the latest PyPI release.  A plain
 `uv tool install cc-switch` no-ops when the tool is already installed.
-Uninstall with `uninstall.sh` / `uninstall.ps1` (config under
-`~/.claude/cc-switch.json` is left in place).
+
+Uninstall with `uninstall.sh` / `uninstall.ps1`.  The uninstaller also
+removes the `ANTHROPIC_AUTH_TOKEN` that `activate` injected into the
+system environment (before dropping the tool, since `credstore`'s CLI
+lives inside the cc-switch environment); config under
+`~/.claude/cc-switch.json` and the generated `~/.claude/settings.json`
+are left in place.
 
 ## Commands
 
@@ -66,7 +71,7 @@ same list again undoes the change.
 cc-switch set deepseek
 # Base URL [..]: https://api.deepseek.com/anthropic
 # API key name (credstore key): DEEPSEEK_API_KEY
-# Supported models (comma separated; toggles against the current list): deepseek-chat,deepseek-reasoner
+# Supported models (comma, space, or semicolon separated; toggles against the current list): deepseek-chat,deepseek-reasoner
 ```
 
 No secret value is ever asked for or written — store it first with:
@@ -82,6 +87,12 @@ injects the API key from credstore into the system environment as
 `ANTHROPIC_AUTH_TOKEN` (mirroring `credstore inject` — registry on
 Windows, shell profile on Unix), so a freshly launched Claude Code
 session inherits it.  The settings file contains **no** credential.
+
+> `activate` **replaces** `~/.claude/settings.json` wholesale — it is not
+> a merge.  Any hand-written settings in that file are overwritten with
+> the generated template (the env block plus `autoUpdatesChannel`).  Keep
+> customisations in a different settings file, or re-apply them after
+> activating.
 
 `settings.json` is written first, then the secret is resolved from
 credstore.  If the key is missing — or credstore itself is not
@@ -99,15 +110,45 @@ cc-switch activate deepseek/deepseek-chat
 If the model is omitted and the provider has exactly one model, it is
 used; if several, you are prompted to pick one.
 
+Because the env injection only affects *new* processes, activating in the
+current shell uses the export line instead:
+
+```bash
+eval "$(cc-switch activate deepseek/deepseek-chat)"
+```
+
+When stdout is piped, cc-switch writes **only** that line to stdout and
+sends its status report to stderr — so the `eval` above is safe.  On a
+terminal, the human-readable report is printed as usual.
+
 ### `cc-switch activate <provider-name/model-name> --custom`
 
 Like `activate`, but lets you override each model slot first —
 `ANTHROPIC_DEFAULT_HAIKU_MODEL`, `ANTHROPIC_DEFAULT_SONNET_MODEL`,
-`ANTHROPIC_DEFAULT_OPUS_MODEL`, `ANTHROPIC_CLAUDE_CODE_SUBAGENT_MODEL`,
-and `ANTHROPIC_CLAUDE_CODE_EFFORT_LEVEL` — one at a time.  Enter a value
-to override, or Enter to keep the default.  The main model slot
-(`ANTHROPIC_MODEL`) is chosen on the command line, not here.  Overrides
-are one-shot: they never touch the stored provider config.
+`ANTHROPIC_DEFAULT_OPUS_MODEL`, `CLAUDE_CODE_SUBAGENT_MODEL`, and
+`CLAUDE_CODE_EFFORT_LEVEL` — one at a time.  Enter a value to override,
+or Enter to keep the default; `-` clears a slot to an empty string.  The
+main model slot (`ANTHROPIC_MODEL`) is chosen on the command line, not
+here.  Overrides are one-shot: they never touch the stored provider
+config.  The effort prompt accepts `low`, `medium`, `high`, `xhigh`,
+`max`, or `auto`.
+
+#### Environment variables written
+
+| Variable | Value |
+|----------|-------|
+| `ANTHROPIC_BASE_URL` | The provider's base URL |
+| `ANTHROPIC_MODEL` | The model chosen on the command line |
+| `ANTHROPIC_DEFAULT_HAIKU_MODEL` / `_SONNET_` / `_OPUS_` | The main model (overridable with `--custom`) |
+| `CLAUDE_CODE_SUBAGENT_MODEL` | The main model (overridable with `--custom`) |
+| `CLAUDE_CODE_EFFORT_LEVEL` | `max` (overridable with `--custom`) |
+
+Watch the prefix: `ANTHROPIC_` marks provider/endpoint and model-slot
+variables, while harness-behaviour variables use a bare `CLAUDE_CODE_`.
+There is no `ANTHROPIC_CLAUDE_CODE_*` namespace — Claude Code ignores an
+unrecognised key **without warning**, so a misspelled slot is silently
+inert rather than an error.  See the
+[environment variables reference](https://code.claude.com/docs/en/env-vars).
 
 ### `cc-switch`
 
@@ -152,7 +193,10 @@ overridden for tests.
   cc-switch owns those slots, and a secret must never reach the plaintext
   config.
 - On a TTY, `activate` prints an activation hint without echoing the
-  secret; when stdout is piped it emits the shell export line for `eval`.
+  secret; when stdout is piped it emits the shell export line for `eval`,
+  and every other line goes to stderr so the piped stream stays clean.
+- `activate` replaces `~/.claude/settings.json` (it does not merge) — see
+  the caveat in the `activate` section above.
 - Restart your shell (or start a new terminal) after activating for the
   env change to take effect in the current session.
 - Secrets are immutable Python `str` — cc-switch follows credstore's
@@ -178,7 +222,7 @@ Bump `version` in `pyproject.toml`, commit, then push a tag with the same
 version:
 
 ```bash
-git tag -a v0.9.12 -m "cc-switch 0.9.12" && git push origin v0.9.12
+git tag -a v0.9.13 -m "cc-switch 0.9.13" && git push origin v0.9.13
 ```
 
 `.github/workflows/publish.yml` fails unless the tag matches the package

@@ -28,8 +28,17 @@ echo ""
 # [1/2] Ensure uv is available.
 if ! command -v uv &>/dev/null; then
     echo -e "${YELLOW}[1/2] Installing uv…${NC}"
-    curl --progress-bar -Lf https://astral.sh/uv/install.sh | sh
+    if ! curl --progress-bar -Lf https://astral.sh/uv/install.sh | sh; then
+        echo -e "${RED}Error: uv installation failed.${NC}"
+        echo -e "${YELLOW}Install uv manually: https://docs.astral.sh/uv/${NC}"
+        exit 1
+    fi
     export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+fi
+if ! command -v uv &>/dev/null; then
+    echo -e "${RED}Error: uv was installed but is not on PATH.${NC}"
+    echo -e "${YELLOW}  Run: source \"\$HOME/.local/bin/env\"  then re-run this installer.${NC}"
+    exit 1
 fi
 echo -e "${GREEN}  ✓${NC} uv $(uv --version 2>&1)"
 
@@ -56,7 +65,7 @@ export PATH="$HOME/.local/bin:$PATH"
 if ! command -v cc-switch &>/dev/null; then
     echo ""
     echo -e "${YELLOW}IMPORTANT: cc-switch is installed but not on your current PATH.${NC}"
-    echo -e "${YELLOW}  Run: source "$HOME/.local/bin/env"${NC}"
+    echo -e "${YELLOW}  Run: source \"\$HOME/.local/bin/env\"${NC}"
     echo -e "${YELLOW}  Or simply open a new terminal.${NC}"
 fi
 

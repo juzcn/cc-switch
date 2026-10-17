@@ -30,10 +30,7 @@ class TestDefaultValue:
             assert default_value(key, "deepseek-chat") == "deepseek-chat"
 
     def test_effort_level_keeps_static_default(self):
-        assert (
-            default_value("ANTHROPIC_CLAUDE_CODE_EFFORT_LEVEL", "deepseek-chat")
-            == "max"
-        )
+        assert default_value("CLAUDE_CODE_EFFORT_LEVEL", "deepseek-chat") == "max"
 
 
 class TestBuildEnv:
@@ -46,8 +43,7 @@ class TestBuildEnv:
             assert env[key] == "deepseek-chat"
         # non-model slot keeps its static default
         assert (
-            env["ANTHROPIC_CLAUDE_CODE_EFFORT_LEVEL"]
-            == DEFAULT_ENV["ANTHROPIC_CLAUDE_CODE_EFFORT_LEVEL"]
+            env["CLAUDE_CODE_EFFORT_LEVEL"] == DEFAULT_ENV["CLAUDE_CODE_EFFORT_LEVEL"]
         )
 
     def test_overrides_applied(self):
@@ -56,7 +52,7 @@ class TestBuildEnv:
         )
         assert env["ANTHROPIC_DEFAULT_HAIKU_MODEL"] == "haiku-x"
         assert env["ANTHROPIC_DEFAULT_SONNET_MODEL"] == "m"
-        assert env["ANTHROPIC_CLAUDE_CODE_EFFORT_LEVEL"] == "max"
+        assert env["CLAUDE_CODE_EFFORT_LEVEL"] == "max"
 
     def test_override_clear_with_empty_string(self):
         env = act.build_env(
@@ -73,11 +69,9 @@ class TestBuildEnv:
         assert env["ANTHROPIC_MODEL"] == "cli-model"
 
     def test_extra_env_overrides_slot(self):
-        provider = dict(
-            PROVIDER, extra_env={"ANTHROPIC_CLAUDE_CODE_EFFORT_LEVEL": "max"}
-        )
+        provider = dict(PROVIDER, extra_env={"CLAUDE_CODE_EFFORT_LEVEL": "max"})
         env = act.build_env(provider, "m")
-        assert env["ANTHROPIC_CLAUDE_CODE_EFFORT_LEVEL"] == "max"
+        assert env["CLAUDE_CODE_EFFORT_LEVEL"] == "max"
 
     def test_no_secret_in_env(self):
         env = act.build_env(PROVIDER, "m")

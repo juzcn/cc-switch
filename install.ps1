@@ -3,10 +3,13 @@
     cc-switch one-click installer for Windows PowerShell.
 
 .DESCRIPTION
-    No prerequisites — the script installs uv if needed, then uses
+    No prerequisites - the script installs uv if needed, then uses
     ``uv tool install --force`` in an isolated environment.  --force makes
     the script idempotent: first run installs, re-runs upgrade to the latest
     PyPI release.  credstore (a dependency) is pulled in automatically by uv.
+
+    ASCII only: Windows PowerShell 5.1 reads a BOM-less .ps1 as ANSI, so a
+    literal em-dash would show up as mojibake in Get-Help output.
 
 .EXAMPLE
     powershell -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/juzcn/cc-switch/main/install.ps1 | iex"
@@ -40,6 +43,12 @@ if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
     powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
     $env:PATH = "$env:USERPROFILE\.local\bin;$env:PATH"
 }
+if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
+    Write-Err "Error: uv was installed but is not on PATH."
+    Write-Warn "Open a new terminal and re-run this installer, or install uv manually:"
+    Write-Warn "  https://docs.astral.sh/uv/"
+    exit 1
+}
 Write-Ok "uv $(uv --version 2>&1)"
 
 # [2/2] Install/update cc-switch from PyPI.  --force: re-running this
@@ -48,16 +57,21 @@ Write-Ok "uv $(uv --version 2>&1)"
 #
 # --python states the interpreter the tool environment needs.  Without it
 # uv picks whichever interpreter it prefers, and cc-switch requires >= 3.13
-# — an older environment has no compatible release to install at all.  With
+# - an older environment has no compatible release to install at all.  With
 # the constraint uv fetches a suitable interpreter, or fails loudly.
 Write-Step "[2/2] Installing/updating cc-switch..."
 $prevEAP = $ErrorActionPreference
 $ErrorActionPreference = "Continue"
-& uv tool install --force --python ">=3.13" cc-switch 2>&1 | Out-Null
+# Capture rather than discard: on failure uv's message is the only thing
+# that explains why (no interpreter satisfying >=3.13, network, PyPI).
+$installOutput = & uv tool install --force --python ">=3.13" cc-switch 2>&1
 $ok = ($LASTEXITCODE -eq 0)
 $ErrorActionPreference = $prevEAP
 if (-not $ok) {
     Write-Err "Error: cc-switch installation failed."
+    if ($installOutput) {
+        $installOutput | Select-Object -Last 10 | ForEach-Object { Write-Dim "    $_" }
+    }
     Write-Warn "Help: $repo"
     exit 1
 }
@@ -68,8 +82,10 @@ $env:PATH = "$localBin;$env:PATH"
 
 # Ensure ~/.local/bin is on the persistent User PATH
 $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
-if ($userPath -notlike "*$localBin*") {
+if ($userPath -and $userPath -notlike "*$localBin*") {
     [Environment]::SetEnvironmentVariable("Path", "$localBin;$userPath", "User")
+} elseif (-not $userPath) {
+    [Environment]::SetEnvironmentVariable("Path", $localBin, "User")
 }
 
 Write-Host ""

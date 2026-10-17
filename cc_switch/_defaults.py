@@ -8,7 +8,14 @@ the command line (``ANTHROPIC_MODEL``), and are never left empty.
 user can change them individually.
 
 Only the non-model slots have a static default
-(``ANTHROPIC_CLAUDE_CODE_EFFORT_LEVEL: max``).
+(``CLAUDE_CODE_EFFORT_LEVEL: max``).
+
+Naming: the ``ANTHROPIC_`` prefix belongs to the provider/endpoint and
+model-slot variables; harness-behaviour variables use a bare
+``CLAUDE_CODE_`` prefix.  There is no ``ANTHROPIC_CLAUDE_CODE_*``
+namespace — Claude Code ignores unrecognised keys without warning, so a
+misspelled slot is silently inert rather than an error.  See
+https://code.claude.com/docs/en/env-vars
 """
 
 from __future__ import annotations
@@ -19,17 +26,18 @@ MAIN_MODEL_SLOT_KEYS = [
     "ANTHROPIC_DEFAULT_HAIKU_MODEL",
     "ANTHROPIC_DEFAULT_SONNET_MODEL",
     "ANTHROPIC_DEFAULT_OPUS_MODEL",
-    "ANTHROPIC_CLAUDE_CODE_SUBAGENT_MODEL",
+    "CLAUDE_CODE_SUBAGENT_MODEL",
 ]
 
 # Env keys that ``activate --custom`` prompts for, in order.
 DEFAULT_OVERRIDE_KEYS = list(MAIN_MODEL_SLOT_KEYS) + [
-    "ANTHROPIC_CLAUDE_CODE_EFFORT_LEVEL",
+    "CLAUDE_CODE_EFFORT_LEVEL",
 ]
 
-# Static default for the non-model slots.
+# Static default for the non-model slots.  ``CLAUDE_CODE_EFFORT_LEVEL``
+# takes precedence over --effort and /effort.
 DEFAULT_ENV: dict[str, str] = {
-    "ANTHROPIC_CLAUDE_CODE_EFFORT_LEVEL": "max",
+    "CLAUDE_CODE_EFFORT_LEVEL": "max",
 }
 
 # Frozen template for the settings.json body — never a credential here.

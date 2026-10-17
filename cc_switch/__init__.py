@@ -9,8 +9,13 @@ the system environment as ``ANTHROPIC_AUTH_TOKEN``.
 
 Modules::
 
-    cc_switch      Package API (get/save/remove/list/activate)
-    cc_switch.cli  Command-line interface (entry point ``cc-switch``)
+    cc_switch._api        Provider config storage (load/save/add/update/remove)
+    cc_switch._activate   settings.json generation + env injection
+    cc_switch._defaults   Model slots and the settings template
+    cc_switch.cli         Command-line interface (entry point ``cc-switch``)
+
+The re-exports below are the provider-config API plus the defaults; the
+activation machinery lives in :mod:`cc_switch._activate`.
 """
 
 from importlib.metadata import PackageNotFoundError
