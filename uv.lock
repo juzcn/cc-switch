@@ -63,7 +63,7 @@ wheels = [
 
 [[package]]
 name = "cc-switch"
-version = "0.9.12"
+version = "0.9.13"
 source = { editable = "." }
 dependencies = [
     { name = "credstore" },
@@ -78,7 +78,7 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "credstore", specifier = ">=0.10.4" }]
+requires-dist = [{ name = "credstore", specifier = ">=0.11.3" }]
 
 [package.metadata.requires-dev]
 dev = [
@@ -268,7 +268,7 @@ wheels = [
 
 [[package]]
 name = "credstore"
-version = "0.11.1"
+version = "0.11.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "jaraco-classes" },
@@ -276,9 +276,9 @@ dependencies = [
     { name = "keyrings-cryptfile" },
     { name = "pywin32-ctypes", marker = "sys_platform == 'win32'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/79/f2/90a92cc62bf070adc0f3b266fb2be506a4b638cf283f2bbac6b2febe5180/credstore-0.11.1.tar.gz", hash = "sha256:d907063d6f461eb0e5042269014fc75f0208d4da6e5060af60e80476e71e2b8f", size = 138497, upload-time = "2026-11-09T03:22:45.229Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/8e/58/7e8f80902e57e18206ad9ab07764ef782e753baa9468e60589f0ba99f7a9/credstore-0.11.3.tar.gz", hash = "sha256:0db66061b46075e11e5bd67858195b847f1f1005357181264b408187a581d04a", size = 141007, upload-time = "2026-11-14T11:50:38.1Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/6c/be/cf7f4f962f063e3c2f4294f2a806eec26359c294b7838b52a10c7b7b0988/credstore-0.11.1-py3-none-any.whl", hash = "sha256:3e2b7220ffa8d9f8297f69e7f08bd2630d4f7525878de09d126ca8508234e4b2", size = 62628, upload-time = "2026-11-09T03:22:44.26Z" },
+    { url = "https://files.pythonhosted.org/packages/94/b2/53e422973d6cb7ff697ef6de8746cebc1445228762dac9b87cb3d6319620/credstore-0.11.3-py3-none-any.whl", hash = "sha256:6a1af6cdf4ba5be10b3d08e8ae1890516959a5577954050ef3184623b96740e3", size = 65137, upload-time = "2026-11-14T11:50:37.147Z" },
 ]
 
 [[package]]

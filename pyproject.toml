@@ -1,6 +1,6 @@
 [project]
 name = "cc-switch"
-version = "0.9.12"
+version = "0.9.13"
 description = "Generate ~/.claude/settings.json from saved provider/model configs"
 readme = "README.md"
 license = { text = "MIT" }
@@ -9,7 +9,14 @@ authors = [
 ]
 requires-python = ">=3.13"
 dependencies = [
-    "credstore>=0.10.4",
+    # 0.11.3 is the floor: it stores every credential under one
+    # `service:username` Credential Manager target.  0.11.1 and earlier mirror
+    # keyring's WinVault two-target layout (bare service + an overflow
+    # `{username}@{service}`), so a credential written by 0.11.3+ is invisible
+    # to them: `get_credential()` returns None with the secret sitting in the
+    # store.  credstore kept no backward-compatible read path by design, so
+    # the floor is a hard requirement rather than a preference.
+    "credstore>=0.11.3",
 ]
 classifiers = [
     "Development Status :: 4 - Beta",

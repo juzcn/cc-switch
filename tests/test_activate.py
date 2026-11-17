@@ -181,3 +181,25 @@ class TestActivate:
         with pytest.raises(act.SecretNotFoundError):
             act.activate(PROVIDER, "deepseek-chat")
         assert os.path.exists(act.SETTINGS_PATH)
+
+
+def test_credstore_floor_matches_the_installed_layout():
+    """The pinned credstore must be one whose Credential Manager layout can
+    read the credentials this machine actually has.
+
+    credstore 0.11.3 changed every credential to a single
+    ``service:username`` target and kept no backward-compatible read path, so
+    a version below it returns ``None`` from ``get_credential()`` while the
+    secret sits in the store — ``activate`` then fails with "not in
+    credstore" and no token is injected.  ``pyproject.toml`` carries the floor;
+    this asserts the floor is high enough, so a downgrade cannot silently
+    reintroduce the bug.
+    """
+    from importlib.metadata import version
+
+    installed = version("credstore")
+    parts = tuple(int(p) for p in installed.split(".")[:3])
+    assert parts >= (0, 11, 3), (
+        f"credstore {installed} predates the single-target layout; "
+        "credentials written by 0.11.3+ are invisible to it"
+    )
